@@ -1,61 +1,52 @@
-FROM docker.io/gradle:jdk21 AS buildstage
+# Stage 1: Cache Gradle dependencies (only when build files change)
+FROM gradle:8-jdk21 AS cache
+ENV GRADLE_USER_HOME=/home/gradle/.gradle
+WORKDIR /home/gradle/app
 
-COPY gradle/ /work/gradle
-COPY settings.gradle.kts build.gradle.kts gradle.properties gradlew /work/
+# Copy entire project for dependency resolution
+# Using Docker-specific settings that excludes waltid-applications
+COPY --chown=gradle:gradle . .
+RUN chmod +x gradlew
 
-COPY waltid-libraries/protocols/waltid-openid4vc/build.gradle.kts /work/waltid-libraries/protocols/waltid-openid4vc/
-COPY waltid-libraries/sdjwt/waltid-sdjwt/build.gradle.kts /work/waltid-libraries/sdjwt/waltid-sdjwt/
-COPY waltid-libraries/crypto/waltid-crypto/build.gradle.kts /work/waltid-libraries/crypto/waltid-crypto/
-COPY waltid-libraries/crypto/waltid-crypto-oci/build.gradle.kts /work/waltid-libraries/crypto/waltid-crypto-oci/
-COPY waltid-libraries/crypto/waltid-crypto-aws/build.gradle.kts /work/waltid-libraries/crypto/waltid-crypto-aws/
-COPY waltid-libraries/waltid-did/build.gradle.kts /work/waltid-libraries/waltid-did/
-COPY waltid-libraries/credentials/waltid-mdoc-credentials/build.gradle.kts /work/waltid-libraries/credentials/waltid-mdoc-credentials/
-COPY waltid-libraries/credentials/waltid-w3c-credentials/build.gradle.kts /work/waltid-libraries/credentials/waltid-w3c-credentials/
-COPY waltid-libraries/credentials/waltid-verification-policies/build.gradle.kts /work/waltid-libraries/credentials/waltid-verification-policies/
-COPY waltid-libraries/credentials/waltid-dif-definitions-parser/build.gradle.kts /work/waltid-libraries/credentials/waltid-dif-definitions-parser/
-COPY waltid-libraries/auth/waltid-ktor-authnz/build.gradle.kts /work/waltid-libraries/auth/waltid-ktor-authnz/
-COPY waltid-libraries/auth/waltid-permissions/build.gradle.kts /work/waltid-libraries/auth/waltid-permissions/
-COPY waltid-libraries/waltid-library-commons/build.gradle.kts /work/waltid-libraries/waltid-library-commons/
-COPY waltid-libraries/waltid-core-wallet/build.gradle.kts /work/waltid-libraries/waltid-core-wallet/
+# Replace settings.gradle.kts with Docker version that excludes waltid-applications
+COPY waltid-services/waltid-wallet-api/settings.gradle.kts.docker ./settings.gradle.kts
 
-COPY waltid-services/waltid-service-commons/build.gradle.kts /work/waltid-services/waltid-service-commons/
-COPY waltid-services/waltid-wallet-api/build.gradle.kts /work/waltid-services/waltid-wallet-api/
+# Download dependencies (this layer will be cached unless build files change)
+# Using BuildKit cache mount for persistent Gradle cache
+RUN --mount=type=cache,target=/home/gradle/.gradle/caches \
+    --mount=type=cache,target=/root/.gradle/caches \
+    ./gradlew :waltid-services:waltid-wallet-api:dependencies --no-daemon || true
 
-WORKDIR /work/waltid-services/waltid-wallet-api/
-RUN gradle build || return 0
+# Stage 2: Build Application
+FROM gradle:8-jdk21 AS build
+ENV GRADLE_USER_HOME=/home/gradle/.gradle
+WORKDIR /home/gradle/src
 
-COPY waltid-libraries/protocols/waltid-openid4vc/. /work/waltid-libraries/protocols/waltid-openid4vc
-COPY waltid-libraries/sdjwt/waltid-sdjwt/. /work/waltid-libraries/sdjwt/waltid-sdjwt
-COPY waltid-libraries/crypto/waltid-crypto/. /work/waltid-libraries/crypto/waltid-crypto
-COPY waltid-libraries/crypto/waltid-crypto-oci/. /work/waltid-libraries/crypto/waltid-crypto-oci
-COPY waltid-libraries/crypto/waltid-crypto-aws/. /work/waltid-libraries/crypto/waltid-crypto-aws
-COPY waltid-libraries/waltid-did/. /work/waltid-libraries/waltid-did
-COPY waltid-libraries/credentials/waltid-mdoc-credentials/. /work/waltid-libraries/credentials/waltid-mdoc-credentials
-COPY waltid-libraries/credentials/waltid-w3c-credentials/. /work/waltid-libraries/credentials/waltid-w3c-credentials
-COPY waltid-libraries/credentials/waltid-verification-policies/. /work/waltid-libraries/credentials/waltid-verification-policies
-COPY waltid-libraries/credentials/waltid-dif-definitions-parser/. /work/waltid-libraries/credentials/waltid-dif-definitions-parser
-COPY waltid-libraries/auth/waltid-ktor-authnz/. /work/waltid-libraries/auth/waltid-ktor-authnz
-COPY waltid-libraries/auth/waltid-permissions/. /work/waltid-libraries/auth/waltid-permissions
-COPY waltid-libraries/waltid-library-commons/. /work/waltid-libraries/waltid-library-commons
-COPY waltid-libraries/waltid-core-wallet/. /work/waltid-libraries/waltid-core-wallet
+# Copy entire project
+COPY --chown=gradle:gradle . .
 
-COPY waltid-services/waltid-service-commons/. /work/waltid-services/waltid-service-commons
-COPY waltid-services/waltid-wallet-api/src/ /work/waltid-services/waltid-wallet-api/src
-COPY waltid-services/waltid-wallet-api/build.gradle.kts waltid-services/waltid-wallet-api/gradlew /work/waltid-services/waltid-wallet-api/
+# Make gradlew executable
+RUN chmod +x gradlew
 
-RUN gradle clean installDist
+# Replace settings.gradle.kts with Docker version that excludes waltid-applications
+COPY waltid-services/waltid-wallet-api/settings.gradle.kts.docker ./settings.gradle.kts
 
-FROM docker.io/eclipse-temurin:21
+# Build with cache mounts for faster rebuilds
+# Using BuildKit cache mounts to persist Gradle cache between builds
+# Use gradlew from project root to ensure proper plugin resolution
+RUN --mount=type=cache,target=/home/gradle/.gradle/caches \
+    --mount=type=cache,target=/root/.gradle/caches \
+    ./gradlew :waltid-services:waltid-wallet-api:buildFatJar --build-cache --parallel --no-daemon
 
-# Non-root user
-RUN useradd --create-home waltid
-
-COPY --from=buildstage /work/waltid-services/waltid-wallet-api/build/install/ /
-
+# Stage 3: Runtime image with slim JRE
+FROM eclipse-temurin:21-jre AS runtime
 WORKDIR /waltid-wallet-api
 
-RUN mkdir /waltid-wallet-api/config && mkdir /waltid-wallet-api/data && chown waltid:waltid /waltid-wallet-api/config /waltid-wallet-api/data
-USER waltid
+# Copy the runnable jar from the build stage and give it a stable name
+COPY --from=build /home/gradle/src/waltid-services/waltid-wallet-api/build/libs/waltid-wallet-api-*.jar ./waltid-wallet-api.jar
+
+# Pre-create directories that will later be mounted as volumes
+RUN mkdir -p config data
 
 EXPOSE 7001
-ENTRYPOINT ["/waltid-wallet-api/bin/waltid-wallet-api"]
+ENTRYPOINT ["java", "-jar", "/waltid-wallet-api/waltid-wallet-api.jar"]

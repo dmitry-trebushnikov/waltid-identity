@@ -1,3 +1,4 @@
+import org.gradle.api.tasks.Copy
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.Properties
@@ -35,7 +36,24 @@ tasks.withType<Zip> {
     isZip64 = true
 }
 
+val mergeServiceFiles by tasks.registering(Copy::class) {
+    val runtimeClasspath = configurations.runtimeClasspath
+    dependsOn(runtimeClasspath) // ensure jars from dependent projects are built first
+    inputs.files(runtimeClasspath)
+    from({
+        runtimeClasspath.get().filter { it.exists() }.map { file ->
+            if (file.isDirectory) file else zipTree(file)
+        }
+    }) {
+        include("META-INF/services/**")
+    }
+    into(layout.buildDirectory.dir("generated/service-resources"))
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+}
+
 tasks.withType<ProcessResources> {
+    dependsOn(mergeServiceFiles)
+    from(mergeServiceFiles)
     doLast {
         layout.buildDirectory.get().file("resources/main/version.properties").asFile.run {
             parentFile.mkdirs()
@@ -172,10 +190,11 @@ dependencies {
     implementation("com.interaso:webpush:1.2.0")
 
     // Config
-    implementation("com.sksamuel.hoplite:hoplite-core:2.8.0")
-    implementation("com.sksamuel.hoplite:hoplite-hocon:2.8.0")
-    implementation("com.sksamuel.hoplite:hoplite-yaml:2.8.0")
-    implementation("com.sksamuel.hoplite:hoplite-hikaricp:2.8.0")
+    val hopliteVersion = "2.9.0"
+    implementation("com.sksamuel.hoplite:hoplite-core:$hopliteVersion")
+    implementation("com.sksamuel.hoplite:hoplite-hocon:$hopliteVersion")
+    implementation("com.sksamuel.hoplite:hoplite-yaml:$hopliteVersion")
+    implementation("com.sksamuel.hoplite:hoplite-hikaricp:$hopliteVersion")
     implementation("com.zaxxer:HikariCP:6.2.1")
 
     // Logging
@@ -193,3 +212,4 @@ dependencies {
     testImplementation("io.mockk:mockk:1.13.16")
     testImplementation("io.klogging:klogging-jvm:0.9.1")
 }
+

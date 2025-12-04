@@ -1,6 +1,8 @@
 package id.walt.commons.config
 
 import com.sksamuel.hoplite.*
+import com.sksamuel.hoplite.hocon.HoconParser
+import com.sksamuel.hoplite.yaml.YamlParser
 import io.klogging.noCoLogger
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.reflect.KClass
@@ -58,8 +60,17 @@ object ConfigManager {
                 .addDecoder(JsonElementDecoder())
                 .addCommandLineSource(args)
                 .addDefaultParsers()
+                .addParser("conf", HoconParser())
+                .addParser("hocon", HoconParser())
+                .addParser("yaml", YamlParser())
+                .addParser("yml", YamlParser())
                 .addEnvironmentSource(allowUppercaseNames = false)
                 .addFileSource("config/$id.conf", optional = true)
+                .addFileSource("config/$id.hocon", optional = true)
+                .addFileSource("config/$id.yaml", optional = true)
+                .addFileSource("config/$id.yml", optional = true)
+                .addFileSource("config/$id.properties", optional = true)
+                .addFileSource("config/$id.props", optional = true)
                 .withExplicitSealedTypes()
                 .build().also { loader -> configLoaders[id] = loader }
                 .loadConfigOrThrow(type, emptyList())

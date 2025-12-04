@@ -42,6 +42,7 @@ dependencies {
     // Config
     api("com.sksamuel.hoplite:hoplite-core:2.9.0")
     api("com.sksamuel.hoplite:hoplite-hocon:2.9.0")
+    api("com.sksamuel.hoplite:hoplite-yaml:2.9.0")
     api("com.sksamuel.hoplite:hoplite-hikaricp:2.9.0")
 
     // Kotlinx.serialization
