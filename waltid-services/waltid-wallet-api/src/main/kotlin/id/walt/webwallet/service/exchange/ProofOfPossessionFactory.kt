@@ -1,7 +1,6 @@
 package id.walt.webwallet.service.exchange
 
 import com.nimbusds.jose.jwk.ECKey
-import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.OfferedCredential
 import id.walt.oid4vc.data.ProofOfPossession
@@ -45,7 +44,7 @@ object ProofOfPossessionFactory {
         credentialOffer: CredentialOffer,
         nonce: String?
     ): ProofOfPossession {
-        val key = DidService.resolveToKey(credentialWallet.did).getOrThrow()
+        val key = credentialWallet.resolveWalletKey()
         val proofType = offeredCredential.proofTypesSupported?.keys?.first() ?: ProofType.jwt
         return credentialWallet.generateKeyProof(
             key = key,

@@ -1,6 +1,5 @@
 package id.walt.webwallet.service.exchange
 
-import id.walt.did.dids.DidService
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialOffer
@@ -175,7 +174,7 @@ object IssuanceService : IssuanceServiceBase() {
 
         // *) Load key:
         // val walletKey = getKeyByDid(credentialWallet.did)
-        val walletKey = DidService.resolveToKey(credentialWallet.did).getOrThrow()
+        val walletKey = credentialWallet.resolveWalletKey()
 
         // *) Create response JWT token, signed by the key for holder DID
         val responseObject = entraIssuanceRequest.getResponseObject(

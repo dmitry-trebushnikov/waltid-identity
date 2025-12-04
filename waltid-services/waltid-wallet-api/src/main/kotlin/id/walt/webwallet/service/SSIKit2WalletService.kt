@@ -22,6 +22,7 @@ import id.walt.did.dids.registrar.LocalRegistrar
 import id.walt.did.dids.registrar.dids.DidCheqdCreateOptions
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
+import id.walt.did.dids.registrar.dids.DidPkhCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.did.utils.EnumUtils.enumValueIgnoreCase
@@ -42,6 +43,7 @@ import id.walt.webwallet.service.category.CategoryService
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
+import id.walt.webwallet.service.dids.WalletDidKeyResolver
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.events.EventDataNotAvailable
@@ -564,9 +566,7 @@ class SSIKit2WalletService(
         }
 
         val resolveSerializedKeyFromDid: suspend (WalletDid) -> Key? = { did ->
-            DidService.resolveToKey(did.did).getOrNull()?.let { k ->
-                resolveSerializedKey(k.getKeyId())
-            }
+            runCatching { WalletDidKeyResolver.resolve(walletId, did.did) }.getOrNull()
         }
 
         // Try to resolve alias as keyId
@@ -597,7 +597,10 @@ class SSIKit2WalletService(
 
     suspend fun getKeyByDid(did: String): Key =
         DidService.resolveToKey(did)
-            .fold(onSuccess = { getKey(it.getKeyId()) }, onFailure = { throw it })
+            .fold(
+                onSuccess = { getKey(it.getKeyId()) },
+                onFailure = { WalletDidKeyResolver.resolve(walletId, did) }
+            )
 
     override suspend fun exportKey(alias: String, format: String, private: Boolean): String = let {
         runCatching {
@@ -909,6 +912,12 @@ class SSIKit2WalletService(
             "cheqd" ->
                 DidCheqdCreateOptions(
                     network = args["network"]?.content ?: "testnet",
+                )
+
+            "pkh" ->
+                DidPkhCreateOptions(
+                    namespace = args["namespace"]?.content ?: "eip155",
+                    reference = args["reference"]?.content ?: "1",
                 )
 
             else -> throw IllegalArgumentException("Did method not supported: $method")

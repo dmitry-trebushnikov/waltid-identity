@@ -42,6 +42,7 @@ import id.walt.w3c.utils.VCFormat
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession
 import id.walt.webwallet.service.credentials.CredentialsService
+import id.walt.webwallet.service.dids.WalletDidKeyResolver
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import io.klogging.Klogging
@@ -86,6 +87,9 @@ class TestCredentialWallet(
             }
         }
     }
+
+    suspend fun resolveWalletKey(did: String = this.did): Key =
+        WalletDidKeyResolver.resolve(wallet, did)
 
     override fun signToken(
         target: TokenTarget,
@@ -221,17 +225,12 @@ class TestCredentialWallet(
         logger.debug("Matched credentials: {matchedCredentials}", matchedCredentials)
 
         logger.debug("Using disclosures: {selectedDisclosures}", selectedDisclosures)
-        val key = runBlocking {
-            runCatching {
-                DidService.resolveToKey(did).getOrThrow().let { KeysService.get(it.getKeyId()) }
-                    ?.let { KeyManager.resolveSerializedKey(it.document) }
-            }
-        }.getOrElse {
+        val key = runCatching { resolveWalletKey() }.getOrElse {
             throw IllegalArgumentException(
                 "Could not resolve key to sign JWS to generate presentation for vp_token",
                 it
             )
-        } ?: error("No key was resolved when trying to resolve key to sign JWS to generate presentation for vp_token")
+        }
 
         val jwtsPresented = CredentialFilterUtils.getJwtVcList(matchedCredentials, selectedDisclosures)
         logger.debug("jwtsPresented: {jwtsPresented}", jwtsPresented)
@@ -377,7 +376,7 @@ class TestCredentialWallet(
     // FIXME: USE DB INSTEAD OF KEY MAPPING
 
     override fun resolveDID(did: String): String = runBlocking {
-        val key = runBlocking { DidService.resolveToKey(did) }.getOrElse {
+        val key = runBlocking { runCatching { resolveWalletKey(did) } }.getOrElse {
             throw IllegalArgumentException(
                 "Could not resolve DID in CredentialWallet: $did, error cause attached.",
                 it
@@ -534,11 +533,12 @@ class TestCredentialWallet(
         }?.id
 
     private suspend fun tryResolveKeyId(keyId: String) = runCatching {
-        val kid = keyId.takeIf { DidUtils.isDidUrl(it) }?.let {
-            DidService.resolveToKey(it).getOrThrow().getKeyId()
-        } ?: keyId
-        KeysService.get(kid)?.let {
-            KeyManager.resolveSerializedKey(it.document)
+        if (DidUtils.isDidUrl(keyId)) {
+            resolveWalletKey(keyId)
+        } else {
+            KeysService.get(keyId)?.let {
+                KeyManager.resolveSerializedKey(it.document)
+            }
         }
     }.getOrElse { throw IllegalArgumentException("Could not resolve key to sign token", it) }
         ?: error("No key was resolved when trying to resolve key to sign token")

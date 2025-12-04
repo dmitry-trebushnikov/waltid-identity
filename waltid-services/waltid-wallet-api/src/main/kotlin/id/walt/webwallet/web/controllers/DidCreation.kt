@@ -17,6 +17,7 @@ object DidCreation {
     private const val DidEbsiMethodName = "ebsi"
     private const val DidCheqdMethodName = "cheqd"
     private const val DidIotaMethodName = "iota"
+    private const val DidPkhMethodName = "pkh"
 
     fun Route.didCreate() {
         post(DidKeyMethodName, {
@@ -86,6 +87,24 @@ object DidCreation {
                 DidIotaMethodName, extractDidCreateParameters(DidIotaMethodName, call.request.queryParameters)
             ).let { call.respond(it) }
         }
+
+        post(DidPkhMethodName, {
+            summary = "Create a did:pkh"
+            request {
+                queryParameter<String>("namespace") {
+                    description = "Blockchain namespace (default: eip155)"
+                    required = false
+                }
+                queryParameter<String>("reference") {
+                    description = "Network identifier / chain reference (default: 1)"
+                    required = false
+                }
+            }
+        }) {
+            call.getWalletService().createDid(
+                DidPkhMethodName, extractDidCreateParameters(DidPkhMethodName, call.request.queryParameters)
+            ).let { call.respond(it) }
+        }
     }
 
     private fun extractDidCreateParameters(method: String, parameters: Parameters): Map<String, JsonPrimitive> = mapOf(
@@ -112,6 +131,10 @@ object DidCreation {
             )
 
             DidCheqdMethodName -> mapOf("network" to JsonPrimitive(parameters["network"]?.takeIf { it.isNotEmpty() } ?: "testnet"))
+            DidPkhMethodName -> mapOf(
+                "namespace" to JsonPrimitive(parameters["namespace"]?.takeIf { it.isNotEmpty() } ?: "eip155"),
+                "reference" to JsonPrimitive(parameters["reference"]?.takeIf { it.isNotEmpty() } ?: "1"),
+            )
             DidJwkMethodName, DidIotaMethodName -> emptyMap()
             else -> emptyMap()
         }

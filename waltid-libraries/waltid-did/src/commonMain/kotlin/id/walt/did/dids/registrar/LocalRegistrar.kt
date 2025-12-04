@@ -6,6 +6,7 @@ import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.registrar.local.cheqd.DidCheqdRegistrar
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
+import id.walt.did.dids.registrar.local.pkh.DidPkhRegistrar
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
@@ -23,6 +24,7 @@ class LocalRegistrar : DidRegistrar {
         DidKeyRegistrar(),
         DidWebRegistrar(),
         DidCheqdRegistrar(),
+        DidPkhRegistrar(),
     ).associateBy { it.method }
 
     @JvmBlocking

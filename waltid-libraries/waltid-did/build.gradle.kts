@@ -113,6 +113,10 @@ kotlin {
                 // Logging
                 implementation("io.github.oshai:kotlin-logging:7.0.5")
 
+                // Hashing (SHA3/Keccak)
+                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.8.0"))
+                implementation("org.kotlincrypto.hash:sha3")
+
 
                 // suspend-transform plugin annotations (required in the current version to avoid "compileOnly" warning)
                 implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")

@@ -196,6 +196,10 @@ object DidService {
             "jwk" -> DidJwkCreateOptions()
             "web" -> DidWebCreateOptions(domain = args["domain"]?.content ?: "", path = args["path"]?.content ?: "")
             "cheqd" -> DidCheqdCreateOptions(network = args["network"]?.content ?: "testnet")
+            "pkh" -> DidPkhCreateOptions(
+                namespace = args["namespace"]?.content ?: "eip155",
+                reference = args["reference"]?.content ?: "1"
+            )
             else -> throw IllegalArgumentException("DID method not supported for auto-configuration: $method")
         }
 
