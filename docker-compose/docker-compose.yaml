@@ -1,4 +1,26 @@
 services:
+
+  gradle-daemon:
+    platform: linux/x86_64
+    image: gradle:8-jdk21
+    profiles:
+      - build
+      - all
+    pull_policy: always
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    entrypoint:
+      - /bin/sh
+      - -c
+      - cd /workspace \
+        && ./gradlew --daemon help -q \
+        && ./gradlew --status || true \
+        ; tail -f /dev/null
+    volumes:
+      - ../:/workspace
+      - gradle-cache:/home/gradle/.gradle
+
   wallet-api:
     platform: linux/x86_64
     image: docker.io/waltid/wallet-api:${VERSION_TAG:-latest}
@@ -255,3 +277,4 @@ services:
 volumes:
   wallet-api-db:
   vault_data:
+  gradle-cache:
